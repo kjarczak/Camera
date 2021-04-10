@@ -4,7 +4,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using System.Xml.Linq;
 
 namespace Camera
 {
@@ -29,8 +33,8 @@ namespace Camera
         
         private double[,] _matrixOfChanges;
         private double[,] _projectionMatrix;
-
-        private List<(int, int)> _lines3D;
+        
+        private List<Figure> _figures;
         private Dictionary<int, Point3D> _points3D;
 
         public Scene()
@@ -60,59 +64,48 @@ namespace Camera
         public void LoadScene()
         {
             _points3D = new Dictionary<int, Point3D>();
-            _lines3D = new List<(int, int)>();
+            _figures = new List<Figure>();
             SetRandomScene();
         }
 
-        public void SetManualScene()
-        {
-            AddGround(1000, 200, -20);
-
-            //AddCube(220, -20, 0, 80, 40, 200);
-            //AddCube(240, 20, 20, 40, 100, 160);
-
-            //AddCube(-100, -20, 0, 40, 200, 200);
-            //AddCube(-120, -20, -20, 40, 40, 40);
-            //AddCube(-200, 100, -20, 40, 40, 40);
-
-        }
         public void SetRandomScene()
         {
+
             var size = 160;
-            
-            AddGround(size, 20, -20);
+            AddGround(new Point3D(-300,0,-300), 5, 6,100,100);
 
             var rng = new Random();
-            for (int i = 0; i < 10; i++)
+            var col = new byte[3]; 
+            for (int i = 0; i < 3; i++)
             {
-                AddCube(rng.NextDouble() * size- size/2, rng.NextDouble() * size - 20, rng.NextDouble() * size- size/2, rng.NextDouble() * 50 + 10, rng.NextDouble() * 50 + 10, rng.NextDouble() * 50 + 10);
+                rng.NextBytes(col);
+                AddCube(rng.NextDouble() * size- size/2, rng.NextDouble() * size - 20, rng.NextDouble() * size- size/2, rng.NextDouble() * 50 + 10, rng.NextDouble() * 50 + 10, rng.NextDouble() * 50 + 10,col);
             }
         }
 
-        private void AddGround(double linesLength, double gap , double yPosition)
+        private void AddGround(Point3D p, int xNumber , int zNumber, double xSize, double zSize)
         {
-            double lines = linesLength / gap + 1;
-            var index = _points3D.Count;
-            var k = 0;
-            for (var i = index; i < index + 2 * lines; i += 2)
+            var figure = new Figure()
             {
-                _points3D.Add(i, new Point3D(k * gap - linesLength / 2, yPosition, -linesLength / 2));
-                _points3D.Add(i + 1, new Point3D(k * gap - linesLength / 2, yPosition, linesLength / 2));
-                _lines3D.Add((i, i + 1));
-                k++;
-            }
+                Fill = Brushes.Purple
+            };
 
-            index = _points3D.Count;
-            k = 0;
-            for (var i = index; i < index + 2 * lines; i += 2)
+            var index = _points3D.Count;
+            for (var i = 0; i < zNumber+1; i++)
             {
-                _points3D.Add(i, new Point3D(-linesLength / 2, yPosition, k * gap - linesLength / 2));
-                _points3D.Add(i + 1, new Point3D(linesLength / 2, yPosition, k * gap - linesLength / 2));
-                _lines3D.Add((i, i + 1));
-                k++;
+                for (var j = 0; j < xNumber+1; j++)
+                {
+                    if (j<xNumber && i<zNumber)
+                    {
+                        figure.Triangles.Add((index, index + xNumber+1, index + xNumber + 2));
+                        figure.Triangles.Add((index, index + xNumber+2, index + 1));
+                    }
+                    _points3D.Add(index++, new Point3D(p.X + j * xSize, p.Y, p.Z + i * zSize));
+                }
             }
+            _figures.Add(figure);
         }
-        public void AddCube(double xPos, double yPos, double zPos, double xSize, double ySize, double zSize)
+        public void AddCube(double xPos, double yPos, double zPos, double xSize, double ySize, double zSize, byte[] col)
         {
             var index = _points3D.Count;
             _points3D.Add(index, new Point3D(xPos, yPos, zPos));
@@ -125,21 +118,22 @@ namespace Camera
             _points3D.Add(index+6, new Point3D(xPos + xSize, yPos + ySize, zPos+zSize));
             _points3D.Add(index+7, new Point3D(xPos + xSize, yPos, zPos+zSize));
 
-            _lines3D.AddRange(new List<(int, int)>()
+            var figure = new Figure(new List<(int, int, int)>()
             {
-                (index,index+1),
-                (index+1,index+2),
-                (index+2,index+3),
-                (index+3,index),
-                (index+4,index+5),
-                (index+5,index+6),
-                (index+6,index+7),
-                (index+7,index+4),
-                (index,index+4),
-                (index+1,index+5),
-                (index+2,index+6),
-                (index+3,index+7),
-            });
+                (index + 3, index, index + 1),
+                (index + 3, index + 1, index + 2),
+                (index + 7, index + 3, index + 2),
+                (index + 7, index + 2, index + 6),
+                (index + 4, index + 7, index + 6),
+                (index + 4, index + 6, index + 5),
+                (index, index + 4, index + 5),
+                (index, index + 5, index + 1),
+                (index + 2, index + 1, index + 5),
+                (index + 2, index + 5, index + 6),
+                (index + 3, index + 4, index),
+                (index + 3, index + 7, index + 4)
+            }) {Fill = new SolidColorBrush(Color.FromRgb(col[0], col[1], col[2]))};
+            _figures.Add(figure);
         }
 
         public void AddZoom(short zoom)
@@ -201,7 +195,7 @@ namespace Camera
             _matrixOfChanges = Multiply(motionMatrix, _matrixOfChanges);
         }
 
-        public (Dictionary<int, Point>, List<(int, int)>) Update(double width, double height)
+        public (Dictionary<int, Point>, List<Figure>) Update(double width, double height)
         { 
             UpdatePoints3D();
             return GeneratePoints2D(width, height);
@@ -230,9 +224,9 @@ namespace Camera
                 { 0, 0, 0, 1}
             };
         }
-        private (Dictionary<int, Point>, List<(int, int)>) GeneratePoints2D(double width, double height)
+        private (Dictionary<int, Point>, List<Figure>) GeneratePoints2D(double width, double height)
         {
-            var (clippedPoints3D, clippedLines) = GetClipped();
+            var (clippedPoints3D, clippedFigures) = GetClipped();
             var points2D = new Dictionary<int, Point>();
 
             foreach (var val in clippedPoints3D)
@@ -245,14 +239,27 @@ namespace Camera
                 points2D.Add(val.Key, new Point { X = x, Y = y });
             }
             
-            return (points2D,clippedLines);
+            return (points2D, clippedFigures);
         }
 
-        private (Dictionary<int, Point3D>, List<(int, int)>) GetClipped()//TODO Implement
+        private (Dictionary<int, Point3D>, List<Figure>) GetClipped()//TODO Implement
         {
             var clippedPoints = _points3D.Where(point => point.Value.Z > 0).ToDictionary(point => point.Key, point => point.Value);
-            var clippedLines = _lines3D.Where(s=> clippedPoints.ContainsKey(s.Item1) && clippedPoints.ContainsKey(s.Item2)).ToList();
-            return (clippedPoints, clippedLines);
+            var clippedFigures = new List<Figure>();
+            foreach (var fig in _figures)
+            {
+                var clippedTriangles = fig.Triangles.Where(s =>
+                    clippedPoints.ContainsKey(s.Item1) && clippedPoints.ContainsKey(s.Item2) &&
+                    clippedPoints.ContainsKey(s.Item3)).ToList();
+
+                //var x = clippedTriangles.Where(s => Vector3D.CrossProduct(
+                //    new Vector3D(_points3D[s.Item2].X - _points3D[s.Item1].X, _points3D[s.Item2].Y - _points3D[s.Item1].Y, _points3D[s.Item2].Z - _points3D[s.Item1].Z),
+                //    new Vector3D(_points3D[s.Item2].X - _points3D[s.Item3].X, _points3D[s.Item2].Y - _points3D[s.Item3].Y, _points3D[s.Item2].Z - _points3D[s.Item3].Z)).Z > -0.2).ToList();
+
+                var clippedFigure = new Figure() { Triangles = clippedTriangles, Fill = fig.Fill, Stroke = fig.Stroke};
+                clippedFigures.Add(clippedFigure);
+            }
+            return (clippedPoints, clippedFigures);
         }
 
         private double[,] Multiply(double[,]a, double[,] b)

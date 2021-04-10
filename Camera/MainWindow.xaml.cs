@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Documents;
+using System.Windows.Ink;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -24,6 +25,8 @@ namespace Camera
     public partial class MainWindow : Window
     {
         private double _canvasHeight;
+        private double _canvasWidth;
+
         private readonly Scene _scene;
         private readonly DispatcherTimer _timer = new DispatcherTimer();
         private readonly short[] _motion = {0,0,0};
@@ -40,6 +43,7 @@ namespace Camera
             _timer.Start();
 
             _canvasHeight = Canvas.Height;
+            _canvasWidth = Canvas.Width;
         }
 
         private void TimerEvent(object sender, EventArgs e)
@@ -69,30 +73,39 @@ namespace Camera
                 _scene.AddTranslation(_motion);
             }
 
-            var (points, lines)=_scene.Update(window.Width, window.Height);
-            DrawView(points, lines);
+            var (points, figures)=_scene.Update(window.Width, window.Height);
+            DrawView(points,figures);
         }
 
-        private void DrawView(Dictionary<int, Point> points2D, List<(int, int)> lines2D)
+        private void DrawView(Dictionary<int, Point> points2D, List<Figure> figures)
         {
             Canvas.Children.Clear();
-            foreach (var (a, b) in lines2D)
+            foreach (var figure in figures)
             {
-                try
-                {   
-                    var line = new Line()
-                    {
-                        X1 = points2D[a].X,
-                        Y1 = _canvasHeight- points2D[a].Y,
-                        X2 = points2D[b].X,
-                        Y2 = _canvasHeight - points2D[b].Y,
-                        Stroke = Brushes.Black
-                    };
-                    Canvas.Children.Add(line);
-                }
-                catch (Exception e)
+                foreach (var (a, b, c) in figure.Triangles)
                 {
-                   Console.WriteLine("Exception"+ e.StackTrace);
+                    try
+                    {
+                        var p1 = new Point(_canvasWidth - points2D[a].X, _canvasHeight - points2D[a].Y);
+                        var p2 = new Point(_canvasWidth - points2D[b].X, _canvasHeight - points2D[b].Y);
+                        var p3 = new Point(_canvasWidth - points2D[c].X, _canvasHeight - points2D[c].Y);
+
+                        var triangle = new Polygon()
+                        {
+                            Stroke = figure.Stroke,
+                            Fill = figure.Fill,
+                            StrokeThickness = 0
+                        };
+                        triangle.Points.Add(p1);
+                        triangle.Points.Add(p2);
+                        triangle.Points.Add(p3);
+
+                        Canvas.Children.Add(triangle);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Exception" + e.StackTrace);
+                    }
                 }
             }
         }
@@ -102,10 +115,10 @@ namespace Camera
             switch (e.Key)
             {   //Translation
                 case Key.D:
-                    _motion[0] = 1;
+                    _motion[0] = -1;
                     break;
                 case Key.A:
-                    _motion[0] = -1;
+                    _motion[0] = 1;
                     break;
                 case Key.Q:
                     _motion[1] = -1;
@@ -127,10 +140,10 @@ namespace Camera
                     _rotation[0] = 1;
                     break;
                 case Key.J:
-                    _rotation[1] = -1;
+                    _rotation[1] = 1;
                     break;
                 case Key.L:
-                    _rotation[1] = 1;
+                    _rotation[1] = -1;
                     break;
                 case Key.O:
                     _rotation[2] = -1;
